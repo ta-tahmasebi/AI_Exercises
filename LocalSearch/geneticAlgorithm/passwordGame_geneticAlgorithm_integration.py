@@ -7,7 +7,7 @@ class PasswordGame:
     def __init__(self, root):
         self.root = root
         self.root.title("Password Guessing Game")
-        self.root.geometry("600x550")
+        self.root.geometry("600x600")  # Increased height to accommodate new labels
         self.root.configure(bg="#2c3e50")
 
         self.play_again_button = tk.Button(root, text="Play Again", font=("Arial", 10, "bold"), bg="#e74c3c", fg="white",
@@ -27,7 +27,17 @@ class PasswordGame:
 
         # Header
         tk.Label(self.root, text="Guess the 6-character password:", font=("Arial", 14, "bold"),
-                 bg="#2c3e50", fg="white").pack(pady=20)
+                 bg="#2c3e50", fg="white").pack(pady=10)
+
+        # Parent Labels
+        self.parent_frame = tk.Frame(self.root, bg="#2c3e50")
+        self.parent_frame.pack(pady=10)
+
+        self.parent1_label = tk.Label(self.parent_frame, text="Parent 1: ", font=("Arial", 12, "bold"), bg="#2c3e50", fg="#2ecc71")
+        self.parent1_label.pack(side=tk.LEFT, padx=10)
+
+        self.parent2_label = tk.Label(self.parent_frame, text="Parent 2: ", font=("Arial", 12, "bold"), bg="#2c3e50", fg="#e74c3c")
+        self.parent2_label.pack(side=tk.LEFT, padx=10)
 
         # Frames for layout
         self.main_frame = tk.Frame(self.root, bg="#2c3e50")
@@ -36,14 +46,14 @@ class PasswordGame:
         self.guess_frame = tk.Frame(self.main_frame, bg="#2c3e50")
         self.guess_frame.pack(side=tk.LEFT, padx=20)
 
-        self.entries, self.results = [], []
+        self.text_widgets, self.results = [], []
         for _ in range(7):
             frame = tk.Frame(self.guess_frame, bg="#2c3e50")
             frame.pack(pady=5)
 
-            entry = tk.Entry(frame, font=self.custom_font, width=10, bg="#ecf0f1", fg="#2c3e50", bd=2, relief=tk.FLAT)
-            entry.pack(side=tk.LEFT, padx=5)
-            self.entries.append(entry)
+            text_widget = tk.Text(frame, font=self.custom_font, width=10, height=1, bg="#ecf0f1", fg="black", bd=2, relief=tk.FLAT)
+            text_widget.pack(side=tk.LEFT, padx=5)
+            self.text_widgets.append(text_widget)
 
             result_label = tk.Label(frame, text="", font=self.custom_font, bg="#2c3e50", fg="white")
             result_label.pack(side=tk.LEFT, padx=10)
@@ -90,6 +100,9 @@ class PasswordGame:
 
         self.excellent_label = tk.Label(self.root, text="", font=("Arial", 16, "bold"), bg="#2c3e50", fg="#2ecc71")
         self.excellent_label.pack(pady=10)
+
+        # Initialize character origins
+        self.character_origins = [[None for _ in range(6)] for _ in range(7)]  # Track character origins
         
         self.random_population()
 
@@ -101,17 +114,26 @@ class PasswordGame:
             self.root.after(40, self.submit)  # Auto-submit every 0.04 sec
 
     def check_guesses(self):
+        self.submission_count += 1
         self.submission_label.config(text=f"Submissions: {self.submission_count}")
         self.excellent_label.config(text="")
 
-        for i, entry in enumerate(self.entries):
-            guess = entry.get().strip()
+        # Reset all text widget backgrounds to default
+        for text_widget in self.text_widgets:
+            text_widget.config(bg="#ecf0f1")  # Default background color
+
+        # Calculate correctness for each guess
+        correctness_scores = []
+        for i, text_widget in enumerate(self.text_widgets):
+            guess = text_widget.get("1.0", tk.END).strip()
             if len(guess) != 6:
                 self.results[i].config(text="Invalid", fg="#e74c3c")
+                correctness_scores.append(-1)  # Invalid guesses get a score of -1
                 continue
 
             correct = sum(1 for j in range(6) if guess[j] == self.password[j])
             self.results[i].config(text=f"{correct}/6", fg="white")
+            correctness_scores.append(correct)
 
             if correct > self.best_guess:
                 self.best_guess = correct
@@ -123,13 +145,30 @@ class PasswordGame:
                 self.auto_running = False
                 return
 
+        # Find the indices of the first and second max scores
+        if len(correctness_scores) >= 2:
+            sorted_indices = sorted(range(len(correctness_scores)), key=lambda i: correctness_scores[i], reverse=True)
+            first_max_index = sorted_indices[0]
+            second_max_index = sorted_indices[1]
+
+            # Highlight the first max entry in green
+            self.text_widgets[first_max_index].config(bg="#2ecc71")  # Green
+            # Highlight the second max entry in red
+            self.text_widgets[second_max_index].config(bg="#e74c3c")  # Red
+
+        # Color characters based on their origin
+        self.color_characters()
+
     def random_population(self):
-        for entry in self.entries:
-            entry.delete(0, tk.END)
-            entry.insert(0, ''.join(random.choices(string.ascii_lowercase, k=6)))
+        for i, text_widget in enumerate(self.text_widgets):
+            text_widget.delete("1.0", tk.END)
+            random_guess = ''.join(random.choices(string.ascii_lowercase, k=6))
+            text_widget.insert("1.0", random_guess)
+            for j in range(6):
+                self.character_origins[i][j] = "random"  # Mark as random
 
     def genetic_algorithm(self):
-        population = [entry.get().strip() for entry in self.entries]
+        population = [text_widget.get("1.0", tk.END).strip() for text_widget in self.text_widgets]
         fitness = [int(result.cget("text").split('/')[0]) for result in self.results]
         if all(fit == 0 for fit in fitness):
             self.random_population()
@@ -141,17 +180,23 @@ class PasswordGame:
             fitness[fitness.index(pick)] = 0
             return parent, pick
 
-        new_population = []
         parent1, fit1 = select_parent()
         parent2, fit2 = select_parent()
 
-        for _ in range(7):
+        # Update parent labels
+        self.parent1_label.config(text=f"Parent 1: {parent1}")
+        self.parent2_label.config(text=f"Parent 2: {parent2}")
+
+        new_population = []
+        for i in range(7):
             s = ""
-            for i in range(6):
+            for j in range(6):
                 if random.random() < fit1 / (fit1 + fit2):
-                    s += parent1[i]
+                    s += parent1[j]
+                    self.character_origins[i][j] = "parent1"  # Track origin
                 else:
-                    s += parent2[i]
+                    s += parent2[j]
+                    self.character_origins[i][j] = "parent2"  # Track origin
             new_population.append(s)
 
         mutation_rate = self.mutation_rate_slider.get()
@@ -159,10 +204,37 @@ class PasswordGame:
             if random.random() < mutation_rate:
                 mutate_point = random.randint(0, 5)
                 new_population[i] = new_population[i][:mutate_point] + random.choice(string.ascii_lowercase) + new_population[i][mutate_point + 1:]
+                self.character_origins[i][mutate_point] = "mutation"  # Track origin
 
-        for entry, new_individual in zip(self.entries, new_population):
-            entry.delete(0, tk.END)
-            entry.insert(0, new_individual)
+        for text_widget, new_individual in zip(self.text_widgets, new_population):
+            text_widget.delete("1.0", tk.END)
+            text_widget.insert("1.0", new_individual)
+
+        # Color characters based on their origin
+        self.color_characters()
+
+    def color_characters(self):
+        for i, text_widget in enumerate(self.text_widgets):
+            text_widget.tag_remove("parent1", "1.0", tk.END)
+            text_widget.tag_remove("parent2", "1.0", tk.END)
+            text_widget.tag_remove("mutation", "1.0", tk.END)
+            text_widget.tag_remove("random", "1.0", tk.END)
+
+            text = text_widget.get("1.0", tk.END).strip()
+            for j in range(len(text)):
+                origin = self.character_origins[i][j]
+                if origin == "parent1":
+                    text_widget.tag_add("parent1", f"1.{j}", f"1.{j + 1}")
+                    text_widget.tag_config("parent1", foreground="green")
+                elif origin == "parent2":
+                    text_widget.tag_add("parent2", f"1.{j}", f"1.{j + 1}")
+                    text_widget.tag_config("parent2", foreground="red")
+                elif origin == "mutation":
+                    text_widget.tag_add("mutation", f"1.{j}", f"1.{j + 1}")
+                    text_widget.tag_config("mutation", foreground="#0b0fde")
+                else:
+                    text_widget.tag_add("random", f"1.{j}", f"1.{j + 1}")
+                    text_widget.tag_config("random", foreground="black")
 
     def update_bar(self):
         bar_height = (self.best_guess / 6) * 300
