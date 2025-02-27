@@ -68,6 +68,10 @@ class PasswordGame:
                                        fg="white", bd=0, activebackground="#27ae60", command=self.submit)
         self.submit_button.pack(side=tk.LEFT, padx=10)
 
+        self.next_population_button = tk.Button(self.submit_frame , text="Generate", font=("Arial", 12, "bold"), bg="#2ecc71",
+                                       fg="white", bd=0, activebackground="#27ae60", command=self.genetic_algorithm)
+        self.next_population_button.pack(side=tk.LEFT, padx=10)
+
         self.auto_var = tk.BooleanVar()
         self.auto_check = tk.Checkbutton(self.submit_frame, text="Auto", font=self.custom_font, bg="#2c3e50",
                                          fg="white", selectcolor="#2c3e50", variable=self.auto_var, command=self.toggle_auto)
@@ -86,17 +90,17 @@ class PasswordGame:
 
         self.excellent_label = tk.Label(self.root, text="", font=("Arial", 16, "bold"), bg="#2c3e50", fg="#2ecc71")
         self.excellent_label.pack(pady=10)
-
+        
         self.random_population()
 
     def submit(self):
         self.check_guesses()
-        self.genetic_algorithm()
         if self.auto_running:
-            self.root.after( 50 , self.submit)  # Auto-submit every 0.04 sec
+            self.genetic_algorithm()
+        if self.auto_running:
+            self.root.after(40, self.submit)  # Auto-submit every 0.04 sec
 
     def check_guesses(self):
-        self.submission_count += 1
         self.submission_label.config(text=f"Submissions: {self.submission_count}")
         self.excellent_label.config(text="")
 
@@ -129,17 +133,25 @@ class PasswordGame:
         fitness = [int(result.cget("text").split('/')[0]) for result in self.results]
         if all(fit == 0 for fit in fitness):
             self.random_population()
-
+            return
+        
         def select_parent():
             pick = max(fitness)
-            return (population[fitness.index(pick)], pick) if pick > 0 else ("aaaaaa", 1)
+            parent = population[fitness.index(pick)]
+            fitness[fitness.index(pick)] = 0
+            return parent, pick
 
         new_population = []
         parent1, fit1 = select_parent()
         parent2, fit2 = select_parent()
 
         for _ in range(7):
-            s = "".join(parent1[j] if random.choices([1, 2], weights=[fit1, fit2])[0] == 1 else parent2[j] for j in range(6))
+            s = ""
+            for i in range(6):
+                if random.random() < fit1 / (fit1 + fit2):
+                    s += parent1[i]
+                else:
+                    s += parent2[i]
             new_population.append(s)
 
         mutation_rate = self.mutation_rate_slider.get()
