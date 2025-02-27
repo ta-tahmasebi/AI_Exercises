@@ -12,8 +12,9 @@ class PasswordGame:
 
         # Generate a random 6-character password
         self.password = ''.join(random.choices(string.ascii_lowercase, k=6))
-        print(self.password)
+        print(self.password)  # For debugging purposes
         self.best_guess = 0  # Track the best guess number
+        self.submission_count = 0  # Track the number of submissions
 
         # Custom font
         self.custom_font = ("Arial", 12)
@@ -75,6 +76,16 @@ class PasswordGame:
         self.bar_canvas.pack()
         self.bar = self.bar_canvas.create_rectangle(5, 300, 25, 300, fill="#e74c3c", outline="")  # Initial height is 0
 
+        # Label to show the number of submissions
+        self.submission_label = tk.Label(
+            self.bar_frame,
+            text="Submissions: 0",
+            font=self.custom_font,
+            bg="#2c3e50",
+            fg="white"
+        )
+        self.submission_label.pack(pady=10)
+
         # Submit button
         self.submit_button = tk.Button(
             root,
@@ -85,7 +96,7 @@ class PasswordGame:
             bd=0,
             activebackground="#27ae60",
             activeforeground="white",
-            command=self.check_guesses
+            command=self.submit
         )
         self.submit_button.pack(pady=20)
 
@@ -99,7 +110,17 @@ class PasswordGame:
         )
         self.excellent_label.pack(pady=10)
 
+    def submit(self):
+        #first check guesses
+        self.check_guesses()
+        #then run the genetic algorithm
+        self.genetic_algorithm()
+
     def check_guesses(self):
+        # Increment the submission count
+        self.submission_count += 1
+        self.submission_label.config(text=f"Submissions: {self.submission_count}")
+
         # Reset the excellent label
         self.excellent_label.config(text="")
 
@@ -128,7 +149,7 @@ class PasswordGame:
                 self.excellent_label.config(text="Excellent!", fg="#2ecc71")
                 self.submit_button.config(state=tk.DISABLED)
                 return
-
+    
     def update_bar(self):
         # Calculate the height of the bar based on the best guess
         bar_height = (self.best_guess / 6) * 300  # Scale to canvas height
